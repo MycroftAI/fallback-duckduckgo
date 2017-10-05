@@ -26,6 +26,7 @@ def split_sentences(text):
     As a side effect, .?! at the end of a sentence are removed
     """
     text = re.sub(r' ([^ .])\.', r' \1~.~', text)
+    text = text.replace('Inc.', 'Inc~.~')
     for c in '!?':
         text = text.replace(c + ' ', '. ')
     sents = text.split('. ')
@@ -50,7 +51,7 @@ class DuckduckgoSkill(FallbackSkill):
     start_words = [
         'is', 'and', 'a', 'of', 'if', 'the',
         'because', 'since', 'for', 'by', 'from',
-        'when', 'between', 'who', 'was'
+        'when', 'between', 'who', 'was', 'in'
     ]
     is_verb = ' is '
     in_word = 'in '
@@ -66,20 +67,19 @@ class DuckduckgoSkill(FallbackSkill):
         LOG.debug('Original abstract: ' + abstract)
         ans = abstract
 
-        if ans[-3:] == '...':
-
-            ans = ans[:-3]
+        if ans[-2:] == '..':
+            while ans[-1] == '.':
+                ans = ans[:-1]
 
             phrases = ans.split(', ')
             first = ', '.join(phrases[:-1])
             last = phrases[-1]
             if last.split()[0] in cls.start_words:
                 ans = first
-            else:
+            last_word = ans.split(' ')[-1]
+            while last_word in cls.start_words or last_word[-3:] == 'ing':
+                ans = ans.replace(' ' + last_word, '')
                 last_word = ans.split(' ')[-1]
-                while last_word in cls.start_words:
-                    ans = ans.replace(' ' + last_word, '')
-                    last_word = ans.split(' ')[-1]
 
         category = None
         match = re.search('\(([a-z ]+)\)', ans)
