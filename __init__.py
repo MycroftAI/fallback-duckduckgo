@@ -11,12 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import re
-import duckduckgo as ddg
+import sys
 
-from mycroft.util import LOG
 from mycroft.skills.core import FallbackSkill
+from mycroft.util import LOG
+
+if sys.version_info[0] >= 3:  # noqa
+    import ddg3 as ddg
+else:
+    import duckduckgo as ddg
 
 
 def split_sentences(text):
