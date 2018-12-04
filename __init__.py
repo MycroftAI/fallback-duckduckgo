@@ -14,13 +14,10 @@
 import re
 import sys
 
-from mycroft.skills.core import FallbackSkill
+from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.util import LOG
 
-if sys.version_info[0] >= 3:  # noqa
-    import ddg3 as ddg
-else:
-    import duckduckgo as ddg
+import ddg3 as ddg
 
 
 def split_sentences(text):
@@ -37,34 +34,26 @@ def split_sentences(text):
     sents = [i.replace('~.~', '.') for i in sents]
     if sents[-1][-1] in '.!?':
         sents[-1] = sents[-1][:-1]
+    print(sents)
     return sents
 
 
-class DuckduckgoSkill(FallbackSkill):
+class DuckduckgoSkill(CommonQuerySkill):
     # Only ones that make sense in
     # <question_word> <question_verb> <noun>
-    question_words = [
-        'who', 'whom', 'what', 'when'
-    ]
+    question_words = ['who', 'whom', 'what', 'when']
     # Note the spaces
-    question_verbs = [
-        ' is', '\'s', 's', ' are', '\'re',
-        're', ' did', ' was', ' were'
-    ]
+    question_verbs = [' is', '\'s', 's', ' are', '\'re',
+                      're', ' did', ' was', ' were']
     articles = ['a', 'an', 'the', 'any']
-    start_words = [
-        'is', 'and', 'a', 'of', 'if', 'the',
-        'because', 'since', 'for', 'by', 'from',
-        'when', 'between', 'who', 'was', 'in'
-    ]
+    start_words = ['is', 'and', 'a', 'of', 'if', 'the',
+                   'because', 'since', 'for', 'by', 'from',
+                   'when', 'between', 'who', 'was', 'in']
     is_verb = ' is '
     in_word = 'in '
 
     def __init__(self):
         super(DuckduckgoSkill, self).__init__()
-
-    def initialize(self):
-        self.register_fallback(self.respond_to_question, 10)
 
     @classmethod
     def format_related(cls, abstract, query):
@@ -120,28 +109,31 @@ class DuckduckgoSkill(FallbackSkill):
         LOG.debug('Query: ' + str(query))
         LOG.debug('Type: ' + r.type)
 
-        if r.answer is not None and r.answer.text and "HASH" not in r.answer.text:
-            self.speak(query + self.is_verb + r.answer.text + '.')
+        if (r.answer is not None and r.answer.text and
+                "HASH" not in r.answer.text):
+            return(query + self.is_verb + r.answer.text + '.')
         elif len(r.abstract.text) > 0:
             sents = split_sentences(r.abstract.text)
-            self.speak(sents[0])
+            return sents[0]
         elif len(r.related) > 0 and len(r.related[0].text) > 0:
             related = split_sentences(r.related[0].text)[0]
-            self.speak(self.format_related(related, query))
+            return(self.format_related(related, query))
         else:
-            return False
+            return None
 
-        return True
-
-    def respond_to_question(self, message):
-        query = message.data['utterance']
+    def CQS_match_query_phrase(self, query):
+        answer = None
         for noun in self.question_words:
             for verb in self.question_verbs:
                 for article in [i + ' ' for i in self.articles] + ['']:
                     test = noun + verb + ' ' + article
                     if query[:len(test)] == test:
-                        return self.respond(query[len(test):])
-        return False
+                        answer = self.respond(query[len(test):])
+                        break
+        if answer:
+            return (query, CQSMatchLevel.CATEGORY, answer)
+        else:
+            return None
 
     def stop(self):
         pass
