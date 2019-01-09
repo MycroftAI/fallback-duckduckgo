@@ -1,4 +1,4 @@
-# <img src='https://rawgithub.com/FortAwesome/Font-Awesome/master/advanced-options/raw-svg/solid/search.svg' card_color='#de5833' width='50' height='50' style='vertical-align:bottom'/> DuckDuckGo
+# <img src='https://raw.githack.com/FortAwesome/Font-Awesome/master/svgs/solid/search.svg' card_color='#de5833' width='50' height='50' style='vertical-align:bottom'/> DuckDuckGo
 Use DuckDuckGo to answer questions
 
 ## About
