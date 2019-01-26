@@ -14,11 +14,20 @@
 import re
 import sys
 
-from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.util import LOG
 from mycroft.version import check_version
 
 import ddg3 as ddg
+
+try:
+    from mycroft.skills.common_query_skill import (CommonQuerySkill,
+                                                   CQSMatchLevel)
+except ImportError:
+    # Compatibility: make sure that skill can be loaded despite missing imports
+    # TODO: Remove in 19.02
+    from mycroft import MycroftSkill
+    class CommonQuerySkill(MycroftSkill):
+        pass
 
 
 def split_sentences(text):
