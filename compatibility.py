@@ -86,7 +86,7 @@ class DuckduckgoSkill(FallbackSkill):
                 last_word = ans.split(' ')[-1]
 
         category = None
-        match = re.search('\(([a-z ]+)\)', ans)
+        match = re.search(r'\(([a-z ]+)\)', ans)
         if match:
             start, end = match.span(1)
             if start <= len(query) * 2:
