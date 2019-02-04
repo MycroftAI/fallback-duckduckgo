@@ -7,9 +7,9 @@ Query DuckDuckGo as a fallback when no other Skill can answer the question.
 Uses the [DuckDuckGo API](https://duckduckgo.com/api) to provide information. 
 
 ## Examples
-* "Who is george washington?"
+* "Who is George Washington?"
 * "What is plasma?"
-* "Who's madonna?"
+* "Who's Madonna?"
 
 ## Credits
 Mycroft AI (@MycroftAI)
