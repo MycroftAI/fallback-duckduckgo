@@ -19,15 +19,7 @@ from mycroft.version import check_version
 
 import ddg3 as ddg
 
-try:
-    from mycroft.skills.common_query_skill import (CommonQuerySkill,
-                                                   CQSMatchLevel)
-except ImportError:
-    # Compatibility: make sure that skill can be loaded despite missing imports
-    # TODO: Remove in 19.02
-    from mycroft import MycroftSkill
-    class CommonQuerySkill(MycroftSkill):
-        pass
+from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 
 
 def split_sentences(text):
@@ -150,10 +142,4 @@ class DuckduckgoSkill(CommonQuerySkill):
 
 
 def create_skill():
-    if check_version("18.8.8"):
-        return DuckduckgoSkill()
-    else:
-        from . import compatibility
-        LOG.warning("Loading compatibility version of "
-                    "mycroft-fallback-duckduckgo")
-        return compatibility.DuckduckgoSkill()
+    return DuckduckgoSkill()
