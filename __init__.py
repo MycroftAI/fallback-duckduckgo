@@ -13,13 +13,16 @@
 # limitations under the License.
 import re
 import sys
+import ddg3 as ddg
+import requests
 
 from mycroft.util import LOG
 from mycroft.version import check_version
-
-import ddg3 as ddg
-
+from xml.etree import ElementTree
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
+from mycroft.skills.skill_data import read_vocab_file
+from adapt.intent import IntentBuilder
+from mycroft import intent_handler
 
 
 def split_sentences(text):
@@ -36,29 +39,32 @@ def split_sentences(text):
     sents = [i.replace('~.~', '.') for i in sents]
     if sents[-1][-1] in '.!?':
         sents[-1] = sents[-1][:-1]
-    print(sents)
     return sents
 
-
 class DuckduckgoSkill(CommonQuerySkill):
-    # Only ones that make sense in
-    # <question_word> <question_verb> <noun>
-    question_words = ['who', 'whom', 'what', 'when']
-    # Note the spaces
-    question_verbs = [' is', '\'s', 's', ' are', '\'re',
-                      're', ' did', ' was', ' were']
-    articles = ['a', 'an', 'the', 'any']
-    start_words = ['is', 'and', 'a', 'of', 'if', 'the',
-                   'because', 'since', 'for', 'by', 'from',
-                   'when', 'between', 'who', 'was', 'in']
-    is_verb = ' is '
-    in_word = 'in '
 
     def __init__(self):
         super(DuckduckgoSkill, self).__init__()
+        self.is_verb = ' is '
+        self.in_word = 'in '
+        # get ddg specific vocab for intent match
+        fname = self.find_resource("DuckDuckGo.voc", res_dirname="locale")
+        temp = read_vocab_file(fname)
+        vocab = []
+        for item in temp:
+            vocab.append( " ".join(item) )
+        self.sorted_vocab = sorted(vocab, key=lambda x: (-len(x), x))
 
+        self.translated_question_words = self.translate_list("question_words")
+        self.translated_question_verbs = self.translate_list("question_verbs")
+        self.translated_articles = self.translate_list("articles")
+        self.translated_start_words = self.translate_list("start_words")
+
+    """
     @classmethod
     def format_related(cls, abstract, query):
+    """
+    def format_related(self, abstract, query):
         LOG.debug('Original abstract: ' + abstract)
         ans = abstract
 
@@ -69,10 +75,10 @@ class DuckduckgoSkill(CommonQuerySkill):
             phrases = ans.split(', ')
             first = ', '.join(phrases[:-1])
             last = phrases[-1]
-            if last.split()[0] in cls.start_words:
+            if last.split()[0] in self.translated_start_words:
                 ans = first
             last_word = ans.split(' ')[-1]
-            while last_word in cls.start_words or last_word[-3:] == 'ing':
+            while last_word in self.translated_start_words or last_word[-3:] == 'ing':
                 ans = ans.replace(' ' + last_word, '')
                 last_word = ans.split(' ')[-1]
 
@@ -85,18 +91,19 @@ class DuckduckgoSkill(CommonQuerySkill):
                 ans = ans.replace('(' + category + ')', '()')
 
         words = ans.split()
-        for article in cls.articles:
+        #for article in cls.articles:
+        for article in self.translated_articles:
             article = article.title()
             if article in words:
                 index = words.index(article)
                 if index <= 2 * len(query.split()):
                     name, desc = words[:index], words[index:]
                     desc[0] = desc[0].lower()
-                    ans = ' '.join(name) + cls.is_verb + ' '.join(desc)
+                    ans = ' '.join(name) + self.is_verb + ' '.join(desc)
                     break
 
         if category:
-            ans = ans.replace('()', cls.in_word + category)
+            ans = ans.replace('()', self.in_word + category)
 
         if ans[-1] not in '.?!':
             ans += '.'
@@ -106,28 +113,57 @@ class DuckduckgoSkill(CommonQuerySkill):
         if len(query) == 0:
             return 0.0
 
-        r = ddg.query(query)
+        # note: '1+1' throws an exception
+        try:
+            r = ddg.query(query)
+        except:
+            LOG.warning("DDG exception!")
+            return None
 
-        LOG.debug('Query: ' + str(query))
-        LOG.debug('Type: ' + r.type)
+        LOG.debug("Query: %s" % (str(query),))
+        LOG.debug("Type: %s" % (r.type,))
+
+        # if disambiguation, save old result
+        # for fallback but try to get the 
+        # real abstract
+        if r.type == 'disambiguation':
+            if r.related:
+                detailed_url = r.related[0].url + "?o=x"
+                LOG.debug("DDG: disambiguating %s" % (detailed_url,))
+                request = requests.get(detailed_url)
+                response = request.content
+                if response:
+                    xml = ElementTree.fromstring(response)
+                    r = ddg.Results(xml)
 
         if (r.answer is not None and r.answer.text and
                 "HASH" not in r.answer.text):
             return(query + self.is_verb + r.answer.text + '.')
         elif len(r.abstract.text) > 0:
             sents = split_sentences(r.abstract.text)
-            return sents[0]
+            #return sents[0]  # what it is
+            #return sents     # what it should be
+            return ". ".join(sents)   # what works for now
         elif len(r.related) > 0 and len(r.related[0].text) > 0:
             related = split_sentences(r.related[0].text)[0]
             return(self.format_related(related, query))
         else:
             return None
 
+    def fix_input(self, query):
+        for noun in self.translated_question_words:
+            for verb in self.translated_question_verbs:
+                for article in [i + ' ' for i in self.translated_articles] + ['']:
+                    test = noun + verb + ' ' + article
+                    if query[:len(test)] == test:
+                        return query[len(test):]
+        return query
+
     def CQS_match_query_phrase(self, query):
         answer = None
-        for noun in self.question_words:
-            for verb in self.question_verbs:
-                for article in [i + ' ' for i in self.articles] + ['']:
+        for noun in self.translated_question_words:
+            for verb in self.translated_question_verbs:
+                for article in [i + ' ' for i in self.translated_articles] + ['']:
                     test = noun + verb + ' ' + article
                     if query[:len(test)] == test:
                         answer = self.respond(query[len(test):])
@@ -135,11 +171,35 @@ class DuckduckgoSkill(CommonQuerySkill):
         if answer:
             return (query, CQSMatchLevel.CATEGORY, answer)
         else:
+            LOG.debug("DDG has no answer")
             return None
 
     def stop(self):
         pass
 
+    @intent_handler(IntentBuilder("AskDucky").require("DuckDuckGo"))
+    def handle_ask_ducky(self, message):
+        """entry point when wiki is called out by name
+           in the utterance"""
+        utt = message.data['utterance']
+
+        if utt is None:
+            return
+
+        for voc in self.sorted_vocab:
+            utt = utt.replace(voc,"")
+
+        utt = utt.strip()
+        utt = self.fix_input(utt)
+        utt = utt.replace("an ","")   # ugh!
+        utt = utt.replace("a ","")   # ugh!
+        utt = utt.replace("the ","")   # ugh!
+
+        if utt is not None:
+            response = self.respond(utt)
+            if response is not None:
+                self.speak_dialog("ddg.specific.response")
+                self.speak(response)
 
 def create_skill():
     return DuckduckgoSkill()
