@@ -60,10 +60,6 @@ class DuckduckgoSkill(CommonQuerySkill):
         self.translated_articles = self.translate_list("articles")
         self.translated_start_words = self.translate_list("start_words")
 
-    """
-    @classmethod
-    def format_related(cls, abstract, query):
-    """
     def format_related(self, abstract, query):
         self.log.debug('Original abstract: ' + abstract)
         ans = abstract
@@ -178,7 +174,7 @@ class DuckduckgoSkill(CommonQuerySkill):
 
     @intent_handler(IntentBuilder("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
-        """entry point when wiki is called out by name
+        """entry point when ddg is called out by name
            in the utterance"""
         utt = message.data['utterance']
 
