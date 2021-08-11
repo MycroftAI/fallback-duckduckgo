@@ -13,15 +13,15 @@
 # limitations under the License.
 import re
 import sys
-import ddg3 as ddg
 import requests
 
-from mycroft.util import LOG
-from mycroft.version import check_version
+import ddg3 as ddg
 from xml.etree import ElementTree
+from adapt.intent import IntentBuilder
+
+from mycroft.version import check_version
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.skills.skill_data import read_vocab_file
-from adapt.intent import IntentBuilder
 from mycroft import intent_handler
 
 
@@ -65,7 +65,7 @@ class DuckduckgoSkill(CommonQuerySkill):
     def format_related(cls, abstract, query):
     """
     def format_related(self, abstract, query):
-        LOG.debug('Original abstract: ' + abstract)
+        self.log.debug('Original abstract: ' + abstract)
         ans = abstract
 
         if ans[-2:] == '..':
@@ -91,7 +91,6 @@ class DuckduckgoSkill(CommonQuerySkill):
                 ans = ans.replace('(' + category + ')', '()')
 
         words = ans.split()
-        #for article in cls.articles:
         for article in self.translated_articles:
             article = article.title()
             if article in words:
@@ -116,12 +115,12 @@ class DuckduckgoSkill(CommonQuerySkill):
         # note: '1+1' throws an exception
         try:
             r = ddg.query(query)
-        except:
-            LOG.warning("DDG exception!")
+        except Exception as e:
+            self.log.warning("DDG exception %s" % (e,))
             return None
 
-        LOG.debug("Query: %s" % (str(query),))
-        LOG.debug("Type: %s" % (r.type,))
+        self.log.debug("Query: %s" % (str(query),))
+        self.log.debug("Type: %s" % (r.type,))
 
         # if disambiguation, save old result
         # for fallback but try to get the 
@@ -129,7 +128,7 @@ class DuckduckgoSkill(CommonQuerySkill):
         if r.type == 'disambiguation':
             if r.related:
                 detailed_url = r.related[0].url + "?o=x"
-                LOG.debug("DDG: disambiguating %s" % (detailed_url,))
+                self.log.debug("DDG: disambiguating %s" % (detailed_url,))
                 request = requests.get(detailed_url)
                 response = request.content
                 if response:
@@ -171,7 +170,7 @@ class DuckduckgoSkill(CommonQuerySkill):
         if answer:
             return (query, CQSMatchLevel.CATEGORY, answer)
         else:
-            LOG.debug("DDG has no answer")
+            self.log.debug("DDG has no answer")
             return None
 
     def stop(self):
