@@ -1,7 +1,8 @@
-import time 
+import time
 
 from behave import then
 from mycroft.messagebus import Message
+
 
 @then('dialog is stopped')
 def dialog_is_stopped(context):

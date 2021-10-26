@@ -12,17 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
-import sys
-import requests
+from xml.etree import ElementTree
 
 import ddg3 as ddg
-from xml.etree import ElementTree
-from adapt.intent import IntentBuilder
+import requests
 
-from mycroft.version import check_version
+from mycroft import AdaptIntent, intent_handler
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.skills.skill_data import read_vocab_file
-from mycroft import intent_handler
 
 
 def split_sentences(text):
@@ -172,7 +169,7 @@ class DuckduckgoSkill(CommonQuerySkill):
     def stop(self):
         pass
 
-    @intent_handler(IntentBuilder("AskDucky").require("DuckDuckGo"))
+    @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
         """entry point when ddg is called out by name
            in the utterance"""
