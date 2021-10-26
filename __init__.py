@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections import namedtuple
 import re
 from xml.etree import ElementTree
 
@@ -20,6 +21,14 @@ import requests
 from mycroft import AdaptIntent, intent_handler
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.skills.skill_data import read_vocab_file
+
+
+Answer = namedtuple(
+    'Answer', ['query', 'response', 'text', 'image'])
+# Set default values to None.
+# Once Python3.7 is min version, we can switch to:
+# Answer = namedtuple('Answer', fields, defaults=(None,) * len(fields))
+Answer.__new__.__defaults__ = (None,) * len(Answer._fields)
 
 
 def split_sentences(text):
@@ -43,6 +52,7 @@ class DuckduckgoSkill(CommonQuerySkill):
 
     def __init__(self):
         super(DuckduckgoSkill, self).__init__()
+        self._match = self._cqs_match = Answer()
         self.is_verb = ' is '
         self.in_word = 'in '
         # get ddg specific vocab for intent match
@@ -114,24 +124,32 @@ class DuckduckgoSkill(CommonQuerySkill):
             ans += '.'
         return ans
 
-    def query_ddg(self, query: str) -> str:
+    def query_ddg(self, query: str) -> Answer:
         """Query DuckDuckGo about the search term.
 
         Args:
             query: search term to use.
         Returns:
-            Short text summary about the query.
+            Answer namedtuple: (
+                Query,
+                DDG response object,
+                Short text summary about the query,
+                image url
+            )
         """
         self.log.debug("Query: %s" % (str(query),))
+        ret = Answer()
         if len(query) == 0:
-            return None
+            return
+        else:
+            ret = ret._replace(query=query)
 
         # note: '1+1' throws an exception
         try:
             response = ddg.query(query)
         except Exception as e:
             self.log.warning("DDG exception %s" % (e,))
-            return None
+            return ret
 
         self.log.info(response.image)
         self.log.debug("Type: %s" % (response.type,))
@@ -148,19 +166,25 @@ class DuckduckgoSkill(CommonQuerySkill):
                     xml = ElementTree.fromstring(detailed_response)
                     response = ddg.Results(xml)
 
+        text_answer = None
+
         if (response.answer is not None and response.answer.text and
                 "HASH" not in response.answer.text):
-            return(query + self.is_verb + response.answer.text + '.')
+            text_answer = query + self.is_verb + response.answer.text + '.'
         elif len(response.abstract.text) > 0:
             sents = split_sentences(response.abstract.text)
             # return sents[0]  # what it is
             # return sents     # what it should be
-            return ". ".join(sents)   # what works for now
+            text_answer = ". ".join(sents)  # what works for now
         elif len(response.related) > 0 and len(response.related[0].text) > 0:
             related = split_sentences(response.related[0].text)[0]
-            return(self.format_related(related, query))
-        else:
-            return None
+            text_answer = self.format_related(related, query)
+
+        if text_answer is not None:
+            ret = ret._replace(response=response, text=text_answer)
+        if response.image is not None and len(response.image) > 0:
+            ret = ret._replace(image=response.image)
+        return ret
 
     def extract_topic(self, query: str) -> str:
         """Extract the topic of a query.
@@ -200,8 +224,8 @@ class DuckduckgoSkill(CommonQuerySkill):
                     if query[:len(test)] == test:
                         answer = self.query_ddg(query[len(test):])
                         break
-        if answer:
-            return (query, CQSMatchLevel.CATEGORY, answer)
+        if answer.text:
+            return (query, CQSMatchLevel.CATEGORY, answer.text)
         else:
             self.log.debug("DDG has no answer")
             return None
@@ -224,10 +248,9 @@ class DuckduckgoSkill(CommonQuerySkill):
         utt = utt.replace("the ", "")   # ugh!
 
         if utt is not None:
-            response = self.query_ddg(utt)
-            if response is not None:
-                self.speak_dialog("ddg.specific.response")
-                self.speak(response)
+            answer = self.query_ddg(utt)
+            if answer.text is not None:
+                self.speak(answer.text)
 
 
 def create_skill():
