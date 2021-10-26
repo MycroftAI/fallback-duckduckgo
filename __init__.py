@@ -137,8 +137,11 @@ class DuckduckgoSkill(CommonQuerySkill):
                 image url
             )
         """
-        self.log.debug("Query: %s" % (str(query),))
         ret = Answer()
+        self.log.debug("Query: %s" % (str(query),))
+        # Apparently DDG prefers title case for queries
+        query = query.title()
+        
         if len(query) == 0:
             return
         else:
@@ -151,7 +154,6 @@ class DuckduckgoSkill(CommonQuerySkill):
             self.log.warning("DDG exception %s" % (e,))
             return ret
 
-        self.log.info(response.image)
         self.log.debug("Type: %s" % (response.type,))
 
         # if disambiguation, save old result for fallback
@@ -182,8 +184,9 @@ class DuckduckgoSkill(CommonQuerySkill):
 
         if text_answer is not None:
             ret = ret._replace(response=response, text=text_answer)
-        if response.image is not None and len(response.image) > 0:
-            ret = ret._replace(image=response.image)
+        if response.image is not None and len(response.image.url) > 0:
+            image_url = 'https://duckduckgo.com/' + response.image.url
+            ret = ret._replace(image=image_url)
         return ret
 
     def extract_topic(self, query: str) -> str:
@@ -225,10 +228,29 @@ class DuckduckgoSkill(CommonQuerySkill):
                         answer = self.query_ddg(query[len(test):])
                         break
         if answer.text:
-            return (query, CQSMatchLevel.CATEGORY, answer.text)
+            self._cqs_match = answer
+            callback_data = {'answer': answer.text}
+            return (query, CQSMatchLevel.CATEGORY, answer.text, callback_data)
         else:
             self.log.debug("DDG has no answer")
             return None
+
+    def CQS_action(self, query: str, data: dict):
+        """Display result if selected by Common Query to answer.
+
+        Note common query will speak the response.
+
+        Args:
+            query: User utterance of original question
+            data: Callback data specified in CQS_match_query_phrase()
+        """
+        if self._cqs_match.text != data.get('answer'):
+            self.log.warning("CQS match data does not match. "
+                             "Cannot display result.")
+            return
+        
+        self.display_answer(self._cqs_match)
+        
 
     @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
@@ -250,7 +272,22 @@ class DuckduckgoSkill(CommonQuerySkill):
         if utt is not None:
             answer = self.query_ddg(utt)
             if answer.text is not None:
+                self.display_answer(answer)
                 self.speak(answer.text)
+
+    def display_answer(self, answer: Answer):
+        """Display the result page on a GUI if connected.
+
+        Arguments:
+            answer: Answer containing necessary fields
+        """
+        self.gui.clear()
+        self.gui['title'] = answer.query.title() or ''
+        self.gui['summary'] = answer.text or ''
+        self.gui['imgLink'] = answer.image or ''
+        # TODO - Duration of article display currently fixed at 60 seconds.
+        # This should be more closely tied with the speech of the summary.
+        self.gui.show_pages(['feature_image.qml', 'summary.qml'], override_idle=60)
 
 
 def create_skill():
