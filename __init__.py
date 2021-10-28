@@ -11,18 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections import namedtuple
 import re
-import sys
-import requests
+from xml.etree import ElementTree
 
 import ddg3 as ddg
-from xml.etree import ElementTree
-from adapt.intent import IntentBuilder
+import requests
 
-from mycroft.version import check_version
+from mycroft import AdaptIntent, intent_handler
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.skills.skill_data import read_vocab_file
-from mycroft import intent_handler
+
+
+Answer = namedtuple(
+    'Answer', ['query', 'response', 'text', 'image'])
+# Set default values to None.
+# Once Python3.7 is min version, we can switch to:
+# Answer = namedtuple('Answer', fields, defaults=(None,) * len(fields))
+Answer.__new__.__defaults__ = (None,) * len(Answer._fields)
 
 
 def split_sentences(text):
@@ -41,10 +47,12 @@ def split_sentences(text):
         sents[-1] = sents[-1][:-1]
     return sents
 
+
 class DuckduckgoSkill(CommonQuerySkill):
 
     def __init__(self):
         super(DuckduckgoSkill, self).__init__()
+        self._match = self._cqs_match = Answer()
         self.is_verb = ' is '
         self.in_word = 'in '
         # get ddg specific vocab for intent match
@@ -52,7 +60,7 @@ class DuckduckgoSkill(CommonQuerySkill):
         temp = read_vocab_file(fname)
         vocab = []
         for item in temp:
-            vocab.append( " ".join(item) )
+            vocab.append(" ".join(item))
         self.sorted_vocab = sorted(vocab, key=lambda x: (-len(x), x))
 
         self.translated_question_words = self.translate_list("question_words")
@@ -60,7 +68,19 @@ class DuckduckgoSkill(CommonQuerySkill):
         self.translated_articles = self.translate_list("articles")
         self.translated_start_words = self.translate_list("start_words")
 
-    def format_related(self, abstract, query):
+    def format_related(self, abstract: str, query: str) -> str:
+        """Extract answer from a related topic abstract.
+
+        When a disambiguation result is returned. The options are called
+        'RelatedTopics'. Each of these has an abstract but they require
+        cleaning before use.
+
+        Args:
+            abstract: text abstract from a Related Topic.
+            query: original search term.
+        Returns:
+            Speakable response about the query.
+        """
         self.log.debug('Original abstract: ' + abstract)
         ans = abstract
 
@@ -104,48 +124,79 @@ class DuckduckgoSkill(CommonQuerySkill):
             ans += '.'
         return ans
 
-    def respond(self, query):
+    def query_ddg(self, query: str) -> Answer:
+        """Query DuckDuckGo about the search term.
+
+        Args:
+            query: search term to use.
+        Returns:
+            Answer namedtuple: (
+                Query,
+                DDG response object,
+                Short text summary about the query,
+                image url
+            )
+        """
+        ret = Answer()
+        self.log.debug("Query: %s" % (str(query),))
+        # Apparently DDG prefers title case for queries
+        query = query.title()
+        
         if len(query) == 0:
-            return 0.0
+            return
+        else:
+            ret = ret._replace(query=query)
 
         # note: '1+1' throws an exception
         try:
-            r = ddg.query(query)
+            response = ddg.query(query)
         except Exception as e:
             self.log.warning("DDG exception %s" % (e,))
-            return None
+            return ret
 
-        self.log.debug("Query: %s" % (str(query),))
-        self.log.debug("Type: %s" % (r.type,))
+        self.log.debug("Type: %s" % (response.type,))
 
-        # if disambiguation, save old result
-        # for fallback but try to get the 
-        # real abstract
-        if r.type == 'disambiguation':
-            if r.related:
-                detailed_url = r.related[0].url + "?o=x"
+        # if disambiguation, save old result for fallback
+        # but try to get the real abstract
+        if response.type == 'disambiguation':
+            if response.related:
+                detailed_url = response.related[0].url + "?o=x"
                 self.log.debug("DDG: disambiguating %s" % (detailed_url,))
                 request = requests.get(detailed_url)
-                response = request.content
-                if response:
-                    xml = ElementTree.fromstring(response)
-                    r = ddg.Results(xml)
+                detailed_response = request.content
+                if detailed_response:
+                    xml = ElementTree.fromstring(detailed_response)
+                    response = ddg.Results(xml)
 
-        if (r.answer is not None and r.answer.text and
-                "HASH" not in r.answer.text):
-            return(query + self.is_verb + r.answer.text + '.')
-        elif len(r.abstract.text) > 0:
-            sents = split_sentences(r.abstract.text)
-            #return sents[0]  # what it is
-            #return sents     # what it should be
-            return ". ".join(sents)   # what works for now
-        elif len(r.related) > 0 and len(r.related[0].text) > 0:
-            related = split_sentences(r.related[0].text)[0]
-            return(self.format_related(related, query))
-        else:
-            return None
+        text_answer = None
 
-    def fix_input(self, query):
+        if (response.answer is not None and response.answer.text and
+                "HASH" not in response.answer.text):
+            text_answer = query + self.is_verb + response.answer.text + '.'
+        elif len(response.abstract.text) > 0:
+            sents = split_sentences(response.abstract.text)
+            # return sents[0]  # what it is
+            # return sents     # what it should be
+            text_answer = ". ".join(sents)  # what works for now
+        elif len(response.related) > 0 and len(response.related[0].text) > 0:
+            related = split_sentences(response.related[0].text)[0]
+            text_answer = self.format_related(related, query)
+
+        if text_answer is not None:
+            ret = ret._replace(response=response, text=text_answer)
+        if response.image is not None and len(response.image.url) > 0:
+            image_url = 'https://duckduckgo.com/' + response.image.url
+            ret = ret._replace(image=image_url)
+        return ret
+
+    def extract_topic(self, query: str) -> str:
+        """Extract the topic of a query.
+
+        Args:
+            query: user utterance eg 'what is the earth'
+        Returns:
+            topic of question eg 'earth' or original query
+        """
         for noun in self.translated_question_words:
             for verb in self.translated_question_verbs:
                 for article in [i + ' ' for i in self.translated_articles] + ['']:
@@ -154,47 +205,90 @@ class DuckduckgoSkill(CommonQuerySkill):
                         return query[len(test):]
         return query
 
-    def CQS_match_query_phrase(self, query):
+    def CQS_match_query_phrase(self, query: str):
+        """Respond to Common Query framework with best possible answer.
+
+        Args:
+            query: question to answer
+
+        Returns:
+            Tuple(
+                question being answered,
+                CQS Match Level confidence,
+                answer to question,
+                callback dict available to CQS_action method
+            )
+        """
         answer = None
         for noun in self.translated_question_words:
             for verb in self.translated_question_verbs:
                 for article in [i + ' ' for i in self.translated_articles] + ['']:
                     test = noun + verb + ' ' + article
                     if query[:len(test)] == test:
-                        answer = self.respond(query[len(test):])
+                        answer = self.query_ddg(query[len(test):])
                         break
-        if answer:
-            return (query, CQSMatchLevel.CATEGORY, answer)
+        if answer.text:
+            self._cqs_match = answer
+            callback_data = {'answer': answer.text}
+            return (query, CQSMatchLevel.CATEGORY, answer.text, callback_data)
         else:
             self.log.debug("DDG has no answer")
             return None
 
-    def stop(self):
-        pass
+    def CQS_action(self, query: str, data: dict):
+        """Display result if selected by Common Query to answer.
 
-    @intent_handler(IntentBuilder("AskDucky").require("DuckDuckGo"))
+        Note common query will speak the response.
+
+        Args:
+            query: User utterance of original question
+            data: Callback data specified in CQS_match_query_phrase()
+        """
+        if self._cqs_match.text != data.get('answer'):
+            self.log.warning("CQS match data does not match. "
+                             "Cannot display result.")
+            return
+        
+        self.display_answer(self._cqs_match)
+        
+
+    @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
-        """entry point when ddg is called out by name
-           in the utterance"""
+        """Intent handler to request information specifically from DDG."""
         utt = message.data['utterance']
 
         if utt is None:
             return
 
         for voc in self.sorted_vocab:
-            utt = utt.replace(voc,"")
+            utt = utt.replace(voc, "")
 
         utt = utt.strip()
-        utt = self.fix_input(utt)
-        utt = utt.replace("an ","")   # ugh!
-        utt = utt.replace("a ","")   # ugh!
-        utt = utt.replace("the ","")   # ugh!
+        utt = self.extract_topic(utt)
+        utt = utt.replace("an ", "")   # ugh!
+        utt = utt.replace("a ", "")   # ugh!
+        utt = utt.replace("the ", "")   # ugh!
 
         if utt is not None:
-            response = self.respond(utt)
-            if response is not None:
-                self.speak_dialog("ddg.specific.response")
-                self.speak(response)
+            answer = self.query_ddg(utt)
+            if answer.text is not None:
+                self.display_answer(answer)
+                self.speak(answer.text)
+
+    def display_answer(self, answer: Answer):
+        """Display the result page on a GUI if connected.
+
+        Arguments:
+            answer: Answer containing necessary fields
+        """
+        self.gui.clear()
+        self.gui['title'] = answer.query.title() or ''
+        self.gui['summary'] = answer.text or ''
+        self.gui['imgLink'] = answer.image or ''
+        # TODO - Duration of article display currently fixed at 60 seconds.
+        # This should be more closely tied with the speech of the summary.
+        self.gui.show_pages(['feature_image.qml', 'summary.qml'], override_idle=60)
+
 
 def create_skill():
     return DuckduckgoSkill()
