@@ -265,9 +265,9 @@ class DuckduckgoSkill(CommonQuerySkill):
 
         utt = utt.strip()
         utt = self.extract_topic(utt)
-        utt = utt.replace("an ", "")   # ugh!
-        utt = utt.replace("a ", "")   # ugh!
-        utt = utt.replace("the ", "")   # ugh!
+        # TODO - improve method of cleaning input
+        for article in self.translated_articles:
+            utt = utt.replace(f"{article} ", "")
 
         if utt is not None:
             answer = self.query_ddg(utt)
