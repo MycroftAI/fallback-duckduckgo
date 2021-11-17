@@ -227,7 +227,7 @@ class DuckduckgoSkill(CommonQuerySkill):
                     if query[:len(test)] == test:
                         answer = self.query_ddg(query[len(test):])
                         break
-        if answer.text:
+        if answer and answer.text:
             self._cqs_match = answer
             callback_data = {'answer': answer.text}
             return (query, CQSMatchLevel.CATEGORY, answer.text, callback_data)
