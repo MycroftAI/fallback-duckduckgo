@@ -273,8 +273,8 @@ class DuckduckgoSkill(CommonQuerySkill):
         if utt is not None:
             answer = self.query_ddg(utt)
             if answer.text is not None:
-                self.speak(answer.text)
                 self.display_answer(answer)
+                self.speak(answer.text)
 
     def display_answer(self, answer: Answer):
         """Display the result page on a GUI if connected.
