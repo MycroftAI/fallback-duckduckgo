@@ -19,7 +19,6 @@ import ddg3 as ddg
 import requests
 
 from mycroft import AdaptIntent, intent_handler
-from mycroft.audio.utils import wait_while_speaking
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.skills.skill_data import read_vocab_file
 
@@ -288,9 +287,7 @@ class DuckduckgoSkill(CommonQuerySkill):
         self.gui['imgLink'] = answer.image or ''
         # TODO - Duration of article display currently fixed at 60 seconds.
         # This should be more closely tied with the speech of the summary.
-        self.gui.show_pages(['feature_image.qml', 'summary.qml'], override_idle=True)
-        wait_while_speaking()
-        self.gui.clear()
+        self.gui.show_pages(['feature_image.qml', 'summary.qml'], override_idle=60)
 
 
 def create_skill():
