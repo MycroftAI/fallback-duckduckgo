@@ -256,25 +256,29 @@ class DuckduckgoSkill(CommonQuerySkill):
     @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
         """Intent handler to request information specifically from DDG."""
-        utt = message.data['utterance']
+        with self.activity():
+            utt = message.data['utterance']
 
-        if utt is None:
-            return
+            if utt is None:
+                self.log.warning('no utterance received')
+                return
 
-        for voc in self.sorted_vocab:
-            utt = utt.replace(voc, "")
+            for voc in self.sorted_vocab:
+                utt = utt.replace(voc, "")
 
-        utt = utt.strip()
-        utt = self.extract_topic(utt)
-        # TODO - improve method of cleaning input
-        for article in self.translated_articles:
-            utt = utt.replace(f"{article} ", "")
+            utt = utt.strip()
+            utt = self.extract_topic(utt)
+            # TODO - improve method of cleaning input
+            for article in self.translated_articles:
+                utt = utt.replace(f"{article} ", "")
 
-        if utt is not None:
-            answer = self.query_ddg(utt)
-            if answer.text is not None:
-                self.speak(answer.text)
-                self.display_answer(answer)
+            if utt is not None:
+                answer = self.query_ddg(utt)
+                if answer.text is not None:
+                    self.speak(answer.text, wait=True)
+                    self.display_answer(answer)
+                else:
+                    self.speak_dialog("no-answer", data={"query": utt}, wait=True)
 
     def display_answer(self, answer: Answer):
         """Display the result page on a GUI if connected.
