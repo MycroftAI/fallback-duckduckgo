@@ -297,5 +297,9 @@ class DuckduckgoSkill(CommonQuerySkill):
         self.gui.clear()
 
 
+    def stop(self):
+        self.log.debug("Ducky stop() hit")
+        self.CQS_release_output_focus()
+
 def create_skill():
     return DuckduckgoSkill()
