@@ -251,6 +251,7 @@ class DuckduckgoSkill(CommonQuerySkill):
             return
         
         self.display_answer(self._cqs_match)
+        wait_while_speaking()
         
 
     @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
