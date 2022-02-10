@@ -275,8 +275,9 @@ class DuckduckgoSkill(CommonQuerySkill):
             if utt is not None:
                 answer = self.query_ddg(utt)
                 if answer.text is not None:
-                    self.speak(answer.text, wait=True)
                     self.display_answer(answer)
+                    self.speak(answer.text, wait=True)
+                    self.gui.release()
                 else:
                     self.speak_dialog("no-answer", data={"query": utt}, wait=True)
 
@@ -293,8 +294,6 @@ class DuckduckgoSkill(CommonQuerySkill):
         # TODO - Duration of article display currently fixed at 60 seconds.
         # This should be more closely tied with the speech of the summary.
         self.gui.show_pages(['feature_image.qml', 'summary.qml'], override_idle=True)
-        wait_while_speaking()
-        self.gui.clear()
 
 
     def stop(self):
