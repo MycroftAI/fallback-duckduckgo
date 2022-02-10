@@ -277,7 +277,7 @@ class DuckduckgoSkill(CommonQuerySkill):
                 if answer.text is not None:
                     self.display_answer(answer)
                     self.speak(answer.text, wait=True)
-                    self.gui.release()
+                    self.gui.clear()
                 else:
                     self.speak_dialog("no-answer", data={"query": utt}, wait=True)
 
