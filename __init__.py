@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from collections import namedtuple
+import itertools
 import re
+from collections import namedtuple
 from xml.etree import ElementTree
 
 import ddg3 as ddg
@@ -21,7 +22,6 @@ import requests
 from mycroft import AdaptIntent, intent_handler
 from mycroft.audio.utils import wait_while_speaking
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
-from mycroft.skills.skill_data import read_vocab_file
 
 
 Answer = namedtuple(
@@ -56,12 +56,12 @@ class DuckduckgoSkill(CommonQuerySkill):
         self._match = self._cqs_match = Answer()
         self.is_verb = ' is '
         self.in_word = 'in '
+
         # get ddg specific vocab for intent match
-        fname = self.find_resource("DuckDuckGo.voc", res_dirname="locale")
-        temp = read_vocab_file(fname)
-        vocab = []
-        for item in temp:
-            vocab.append(" ".join(item))
+        vocab = set(itertools.chain.from_iterable(
+            self.resources.load_vocabulary_file("DuckDuckGo")
+        ))
+
         self.sorted_vocab = sorted(vocab, key=lambda x: (-len(x), x))
 
         self.translated_question_words = self.translate_list("question_words")
