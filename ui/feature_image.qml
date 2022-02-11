@@ -24,12 +24,12 @@ Mycroft.CardDelegate {
     cardBackgroundOverlayColor: "black"
 
     Img {
-        width: Mycroft.Units.gridUnit * 6
-        height: Mycroft.Units.gridUnit * 6
+        width: Mycroft.Units.gridUnit * 3
+        height: Mycroft.Units.gridUnit * 3
         anchors.top: parent.top
         anchors.topMargin: Mycroft.Units.gridUnit
 
-        imgSrc: Qt.resolvedUrl("images/ddg-logo.svg")
+        imgSrc: Qt.resolvedUrl("images/ddg_black_bg.svg")
     }
 
     Title {
