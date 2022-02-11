@@ -23,6 +23,15 @@ Mycroft.CardDelegate {
     id: root
     cardBackgroundOverlayColor: "black"
 
+    Img {
+        width: Mycroft.Units.gridUnit * 3
+        height: Mycroft.Units.gridUnit * 3
+        anchors.top: parent.top
+        anchors.topMargin: Mycroft.Units.gridUnit
+
+        imgSrc: Qt.resolvedUrl("images/ddg-logo.svg")
+    }
+
     Title {
         id: articleTitle
         anchors.top: parent.top
@@ -39,6 +48,6 @@ Mycroft.CardDelegate {
         height: parent.height - Mycroft.Units.gridUnit * 6
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        imgSrc: sessionData.imgLink || Qt.resolvedUrl("images/ddg-logo.svg")
+        imgSrc: sessionData.imgLink
     }
 }

@@ -294,7 +294,7 @@ class DuckduckgoSkill(CommonQuerySkill):
         self.gui['imgLink'] = answer.image or ''
         # TODO - Duration of article display currently fixed at 60 seconds.
         # This should be more closely tied with the speech of the summary.
-        self.gui.show_pages(['feature_image.qml', 'summary.qml'], override_idle=True)
+        self.gui.show_page('feature_image.qml', override_idle=True)
 
 
     def stop(self):
