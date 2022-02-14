@@ -3,3 +3,4 @@
 __pycache__/*
 # Files created by the skill
 settings.json
+.wh.*
