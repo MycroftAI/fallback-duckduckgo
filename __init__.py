@@ -278,7 +278,7 @@ class DuckduckgoSkill(CommonQuerySkill):
                 if answer.text is not None:
                     self.display_answer(answer)
                     self.speak(answer.text, wait=True)
-                    self.gui.clear()
+                    self.gui.release()
                 else:
                     self.speak_dialog("no-answer", data={"query": utt}, wait=True)
 
@@ -288,7 +288,6 @@ class DuckduckgoSkill(CommonQuerySkill):
         Arguments:
             answer: Answer containing necessary fields
         """
-        self.gui.clear()
         self.gui['title'] = answer.query.title() or ''
         self.gui['summary'] = answer.text or ''
         self.gui['imgLink'] = answer.image or ''
