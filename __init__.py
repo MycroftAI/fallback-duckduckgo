@@ -21,7 +21,7 @@ import requests
 from mycroft import AdaptIntent, intent_handler
 from mycroft.audio.utils import wait_while_speaking
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
-from mycroft.skills.skill_data import read_vocab_file
+from mycroft.skills.skill_data import VocabularyFile
 
 
 Answer = namedtuple(
@@ -57,8 +57,10 @@ class DuckduckgoSkill(CommonQuerySkill):
         self.is_verb = ' is '
         self.in_word = 'in '
         # get ddg specific vocab for intent match
-        fname = self.find_resource("DuckDuckGo.voc", res_dirname="locale")
-        temp = read_vocab_file(fname)
+        resource_file = VocabularyFile(
+            self.resources.types.vocabulary, "DuckDuckGo"
+        )
+        temp = resource_file.load()
         vocab = []
         for item in temp:
             vocab.append(" ".join(item))
