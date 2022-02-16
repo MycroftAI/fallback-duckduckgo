@@ -22,7 +22,6 @@ import requests
 from mycroft import AdaptIntent, intent_handler
 from mycroft.audio.utils import wait_while_speaking
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
-from mycroft.skills.skill_data import VocabularyFile
 
 
 Answer = namedtuple(
