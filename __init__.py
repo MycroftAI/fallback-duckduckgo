@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from collections import namedtuple
+import itertools
 import re
+from collections import namedtuple
 from xml.etree import ElementTree
 
 import ddg3 as ddg
@@ -56,14 +57,12 @@ class DuckduckgoSkill(CommonQuerySkill):
         self._match = self._cqs_match = Answer()
         self.is_verb = ' is '
         self.in_word = 'in '
+
         # get ddg specific vocab for intent match
-        resource_file = VocabularyFile(
-            self.resources.types.vocabulary, "DuckDuckGo"
-        )
-        temp = resource_file.load()
-        vocab = []
-        for item in temp:
-            vocab.append(" ".join(item))
+        vocab = set(itertools.chain.from_iterable(
+            self.resources.load_vocabulary_file("DuckDuckGo")
+        ))
+
         self.sorted_vocab = sorted(vocab, key=lambda x: (-len(x), x))
 
         self.translated_question_words = self.translate_list("question_words")
@@ -253,30 +252,36 @@ class DuckduckgoSkill(CommonQuerySkill):
             return
         
         self.display_answer(self._cqs_match)
-        
+        wait_while_speaking()
+
 
     @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
         """Intent handler to request information specifically from DDG."""
-        utt = message.data['utterance']
+        with self.activity():
+            utt = message.data['utterance']
 
-        if utt is None:
-            return
+            if utt is None:
+                self.log.warning('no utterance received')
+                return
 
-        for voc in self.sorted_vocab:
-            utt = utt.replace(voc, "")
+            for voc in self.sorted_vocab:
+                utt = utt.replace(voc, "")
 
-        utt = utt.strip()
-        utt = self.extract_topic(utt)
-        # TODO - improve method of cleaning input
-        for article in self.translated_articles:
-            utt = utt.replace(f"{article} ", "")
+            utt = utt.strip()
+            utt = self.extract_topic(utt)
+            # TODO - improve method of cleaning input
+            for article in self.translated_articles:
+                utt = utt.replace(f"{article} ", "")
 
-        if utt is not None:
-            answer = self.query_ddg(utt)
-            if answer.text is not None:
-                self.speak(answer.text)
-                self.display_answer(answer)
+            if utt is not None:
+                answer = self.query_ddg(utt)
+                if answer.text is not None:
+                    self.display_answer(answer)
+                    self.speak(answer.text, wait=True)
+                    self.gui.release()
+                else:
+                    self.speak_dialog("no-answer", data={"query": utt}, wait=True)
 
     def display_answer(self, answer: Answer):
         """Display the result page on a GUI if connected.
@@ -284,16 +289,17 @@ class DuckduckgoSkill(CommonQuerySkill):
         Arguments:
             answer: Answer containing necessary fields
         """
-        self.gui.clear()
         self.gui['title'] = answer.query.title() or ''
         self.gui['summary'] = answer.text or ''
         self.gui['imgLink'] = answer.image or ''
         # TODO - Duration of article display currently fixed at 60 seconds.
         # This should be more closely tied with the speech of the summary.
-        self.gui.show_pages(['feature_image.qml', 'summary.qml'], override_idle=True)
-        wait_while_speaking()
-        self.gui.clear()
+        self.gui.show_page('feature_image.qml', override_idle=True)
 
+
+    def stop(self):
+        self.log.debug("Ducky stop() hit")
+        self.CQS_release_output_focus()
 
 def create_skill():
     return DuckduckgoSkill()
