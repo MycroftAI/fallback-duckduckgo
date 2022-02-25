@@ -20,7 +20,6 @@ import ddg3 as ddg
 import requests
 
 from mycroft import AdaptIntent, intent_handler
-from mycroft.audio.utils import wait_while_speaking
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 
 
@@ -251,7 +250,7 @@ class DuckduckgoSkill(CommonQuerySkill):
             return
         
         self.display_answer(self._cqs_match)
-        wait_while_speaking()
+        self.speak(self._cqs_match.text, wait=True)
 
 
     @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
