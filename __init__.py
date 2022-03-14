@@ -23,8 +23,7 @@ from mycroft import AdaptIntent, intent_handler
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 
 
-Answer = namedtuple(
-    'Answer', ['query', 'response', 'text', 'image'])
+Answer = namedtuple("Answer", ["query", "response", "text", "image"])
 # Set default values to None.
 # Once Python3.7 is min version, we can switch to:
 # Answer = namedtuple('Answer', fields, defaults=(None,) * len(fields))
@@ -37,29 +36,30 @@ def split_sentences(text):
     handling the edge case of names with initials
     As a side effect, .?! at the end of a sentence are removed
     """
-    text = re.sub(r' ([^ .])\.', r' \1~.~', text)
-    text = text.replace('Inc.', 'Inc~.~')
-    for c in '!?':
-        text = text.replace(c + ' ', '. ')
-    sents = text.split('. ')
-    sents = [i.replace('~.~', '.') for i in sents]
-    if sents[-1][-1] in '.!?':
+    text = re.sub(r" ([^ .])\.", r" \1~.~", text)
+    text = text.replace("Inc.", "Inc~.~")
+    for c in "!?":
+        text = text.replace(c + " ", ". ")
+    sents = text.split(". ")
+    sents = [i.replace("~.~", ".") for i in sents]
+    if sents[-1][-1] in ".!?":
         sents[-1] = sents[-1][:-1]
     return sents
 
 
 class DuckduckgoSkill(CommonQuerySkill):
-
     def __init__(self):
         super(DuckduckgoSkill, self).__init__()
         self._match = self._cqs_match = Answer()
-        self.is_verb = ' is '
-        self.in_word = 'in '
+        self.is_verb = " is "
+        self.in_word = "in "
 
         # get ddg specific vocab for intent match
-        vocab = set(itertools.chain.from_iterable(
-            self.resources.load_vocabulary_file("DuckDuckGo")
-        ))
+        vocab = set(
+            itertools.chain.from_iterable(
+                self.resources.load_vocabulary_file("DuckDuckGo")
+            )
+        )
 
         self.sorted_vocab = sorted(vocab, key=lambda x: (-len(x), x))
 
@@ -81,30 +81,30 @@ class DuckduckgoSkill(CommonQuerySkill):
         Returns:
             Speakable response about the query.
         """
-        self.log.debug('Original abstract: ' + abstract)
+        self.log.debug("Original abstract: " + abstract)
         ans = abstract
 
-        if ans[-2:] == '..':
-            while ans[-1] == '.':
+        if ans[-2:] == "..":
+            while ans[-1] == ".":
                 ans = ans[:-1]
 
-            phrases = ans.split(', ')
-            first = ', '.join(phrases[:-1])
+            phrases = ans.split(", ")
+            first = ", ".join(phrases[:-1])
             last = phrases[-1]
             if last.split()[0] in self.translated_start_words:
                 ans = first
-            last_word = ans.split(' ')[-1]
-            while last_word in self.translated_start_words or last_word[-3:] == 'ing':
-                ans = ans.replace(' ' + last_word, '')
-                last_word = ans.split(' ')[-1]
+            last_word = ans.split(" ")[-1]
+            while last_word in self.translated_start_words or last_word[-3:] == "ing":
+                ans = ans.replace(" " + last_word, "")
+                last_word = ans.split(" ")[-1]
 
         category = None
-        match = re.search(r'\(([a-z ]+)\)', ans)
+        match = re.search(r"\(([a-z ]+)\)", ans)
         if match:
             start, end = match.span(1)
             if start <= len(query) * 2:
                 category = match.group(1)
-                ans = ans.replace('(' + category + ')', '()')
+                ans = ans.replace("(" + category + ")", "()")
 
         words = ans.split()
         for article in self.translated_articles:
@@ -114,14 +114,14 @@ class DuckduckgoSkill(CommonQuerySkill):
                 if index <= 2 * len(query.split()):
                     name, desc = words[:index], words[index:]
                     desc[0] = desc[0].lower()
-                    ans = ' '.join(name) + self.is_verb + ' '.join(desc)
+                    ans = " ".join(name) + self.is_verb + " ".join(desc)
                     break
 
         if category:
-            ans = ans.replace('()', self.in_word + category)
+            ans = ans.replace("()", self.in_word + category)
 
-        if ans[-1] not in '.?!':
-            ans += '.'
+        if ans[-1] not in ".?!":
+            ans += "."
         return ans
 
     def query_ddg(self, query: str) -> Answer:
@@ -141,7 +141,7 @@ class DuckduckgoSkill(CommonQuerySkill):
         self.log.debug("Query: %s" % (str(query),))
         # Apparently DDG prefers title case for queries
         query = query.title()
-        
+
         if len(query) == 0:
             return
         else:
@@ -158,7 +158,7 @@ class DuckduckgoSkill(CommonQuerySkill):
 
         # if disambiguation, save old result for fallback
         # but try to get the real abstract
-        if response.type == 'disambiguation':
+        if response.type == "disambiguation":
             if response.related:
                 detailed_url = response.related[0].url + "?o=x"
                 self.log.debug("DDG: disambiguating %s" % (detailed_url,))
@@ -170,9 +170,12 @@ class DuckduckgoSkill(CommonQuerySkill):
 
         text_answer = None
 
-        if (response.answer is not None and response.answer.text and
-                "HASH" not in response.answer.text):
-            text_answer = query + self.is_verb + response.answer.text + '.'
+        if (
+            response.answer is not None
+            and response.answer.text
+            and "HASH" not in response.answer.text
+        ):
+            text_answer = query + self.is_verb + response.answer.text + "."
         elif len(response.abstract.text) > 0:
             sents = split_sentences(response.abstract.text)
             # return sents[0]  # what it is
@@ -185,7 +188,7 @@ class DuckduckgoSkill(CommonQuerySkill):
         if text_answer is not None:
             ret = ret._replace(response=response, text=text_answer)
         if response.image is not None and len(response.image.url) > 0:
-            image_url = 'https://duckduckgo.com/' + response.image.url
+            image_url = "https://duckduckgo.com/" + response.image.url
             ret = ret._replace(image=image_url)
         return ret
 
@@ -199,10 +202,10 @@ class DuckduckgoSkill(CommonQuerySkill):
         """
         for noun in self.translated_question_words:
             for verb in self.translated_question_verbs:
-                for article in [i + ' ' for i in self.translated_articles] + ['']:
-                    test = noun + verb + ' ' + article
-                    if query[:len(test)] == test:
-                        return query[len(test):]
+                for article in [i + " " for i in self.translated_articles] + [""]:
+                    test = noun + verb + " " + article
+                    if query[: len(test)] == test:
+                        return query[len(test) :]
         return query
 
     def CQS_match_query_phrase(self, query: str):
@@ -222,14 +225,14 @@ class DuckduckgoSkill(CommonQuerySkill):
         answer = None
         for noun in self.translated_question_words:
             for verb in self.translated_question_verbs:
-                for article in [i + ' ' for i in self.translated_articles] + ['']:
-                    test = noun + verb + ' ' + article
-                    if query[:len(test)] == test:
-                        answer = self.query_ddg(query[len(test):])
+                for article in [i + " " for i in self.translated_articles] + [""]:
+                    test = noun + verb + " " + article
+                    if query[: len(test)] == test:
+                        answer = self.query_ddg(query[len(test) :])
                         break
         if answer and answer.text:
             self._cqs_match = answer
-            callback_data = {'answer': answer.text}
+            callback_data = {"answer": answer.text}
             return (query, CQSMatchLevel.CATEGORY, answer.text, callback_data)
         else:
             self.log.debug("DDG has no answer")
@@ -244,23 +247,21 @@ class DuckduckgoSkill(CommonQuerySkill):
             query: User utterance of original question
             data: Callback data specified in CQS_match_query_phrase()
         """
-        if self._cqs_match.text != data.get('answer'):
-            self.log.warning("CQS match data does not match. "
-                             "Cannot display result.")
+        if self._cqs_match.text != data.get("answer"):
+            self.log.warning("CQS match data does not match. " "Cannot display result.")
             return
-        
+
         self.display_answer(self._cqs_match)
         self.speak(self._cqs_match.text, wait=True)
-
 
     @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
         """Intent handler to request information specifically from DDG."""
         with self.activity():
-            utt = message.data['utterance']
+            utt = message.data["utterance"]
 
             if utt is None:
-                self.log.warning('no utterance received')
+                self.log.warning("no utterance received")
                 return
 
             for voc in self.sorted_vocab:
@@ -287,17 +288,17 @@ class DuckduckgoSkill(CommonQuerySkill):
         Arguments:
             answer: Answer containing necessary fields
         """
-        self.gui['title'] = answer.query.title() or ''
-        self.gui['summary'] = answer.text or ''
-        self.gui['imgLink'] = answer.image or ''
+        self.gui["title"] = answer.query.title() or ""
+        self.gui["summary"] = answer.text or ""
+        self.gui["imgLink"] = answer.image or ""
         # TODO - Duration of article display currently fixed at 60 seconds.
         # This should be more closely tied with the speech of the summary.
-        self.gui.show_page('feature_image.qml', override_idle=True)
-
+        self.gui.show_page("feature_image.qml", override_idle=True)
 
     def stop(self):
         self.log.debug("Ducky stop() hit")
         self.CQS_release_output_focus()
+
 
 def create_skill():
     return DuckduckgoSkill()
