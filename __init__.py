@@ -251,8 +251,9 @@ class DuckduckgoSkill(CommonQuerySkill):
             self.log.warning("CQS match data does not match. " "Cannot display result.")
             return
 
-        self.display_answer(self._cqs_match)
-        self.speak(self._cqs_match.text, wait=True)
+        with self.activity():
+            self.display_answer(self._cqs_match)
+            self.speak(self._cqs_match.text, wait=True)
 
     @intent_handler(AdaptIntent("AskDucky").require("DuckDuckGo"))
     def handle_ask_ducky(self, message):
