@@ -226,16 +226,18 @@ class DuckduckgoSkill(CommonQuerySkill):
         for noun in self.translated_question_words:
             for verb in self.translated_question_verbs:
                 for article in [i + " " for i in self.translated_articles] + [""]:
-                    test = noun + verb + " " + article
-                    if query[: len(test)] == test:
-                        answer = self.query_ddg(query[len(test) :])
+                    test = " ".join(s.strip() for s in (noun, verb, article))
+                    test_query = query[: len(test)]
+                    if test_query == test:
+                        self.log.info("Search DuckDuckGo for %s", test_query)
+                        answer = self.query_ddg(test_query)
                         break
         if answer and answer.text:
             self._cqs_match = answer
             callback_data = {"answer": answer.text}
-            return (query, CQSMatchLevel.CATEGORY, answer.text, callback_data)
+            return (query, CQSMatchLevel.GENERAL, answer.text, callback_data)
         else:
-            self.log.debug("DDG has no answer")
+            self.log.info("DDG has no answer")
             return None
 
     def CQS_action(self, query: str, data: dict):
