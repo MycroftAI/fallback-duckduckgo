@@ -203,9 +203,11 @@ class DuckduckgoSkill(CommonQuerySkill):
         for noun in self.translated_question_words:
             for verb in self.translated_question_verbs:
                 for article in [i + " " for i in self.translated_articles] + [""]:
-                    test = noun + verb + " " + article
-                    if query[: len(test)] == test:
-                        return query[len(test) :]
+                    test = " ".join(s.strip() for s in (noun, verb, article))
+                    test_query = query[: len(test)]
+                    if test_query == test:
+                        query_topic = query[len(test) :]
+                        return query_topic
         return query
 
     def CQS_match_query_phrase(self, query: str):
@@ -223,15 +225,9 @@ class DuckduckgoSkill(CommonQuerySkill):
             )
         """
         answer = None
-        for noun in self.translated_question_words:
-            for verb in self.translated_question_verbs:
-                for article in [i + " " for i in self.translated_articles] + [""]:
-                    test = " ".join(s.strip() for s in (noun, verb, article))
-                    test_query = query[: len(test)]
-                    if test_query == test:
-                        self.log.info("Search DuckDuckGo for %s", test_query)
-                        answer = self.query_ddg(test_query)
-                        break
+        query_topic = self.extract_topic(query)
+        self.log.info("Search DuckDuckGo for %s", query_topic)
+        answer = self.query_ddg(query_topic)
         if answer and answer.text:
             self._cqs_match = answer
             callback_data = {"answer": answer.text}
